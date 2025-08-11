@@ -88,7 +88,6 @@
 
   <div id="view" class="card" style="margin-top:12px;min-height:340px">กำลังเริ่มระบบ…</div>
 
-  <!-- Modal -->
   <div id="modal" style="position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:9998">
     <div class="card" style="width:min(680px,96vw)">
       <div class="row" style="justify-content:space-between;align-items:center">
@@ -191,14 +190,15 @@ function getVoice(){
   return state.voice ? voices.find(v=>v.name===state.voice) : voices.find(v=> v.lang?.toLowerCase().startsWith('en'));
 }
 function speak(text){
-  if(!('speechSynthesis' in window)) return;
+  if(!('speechSynthesis' in window) || !text) return;
   const u=new SpeechSynthesisUtterance(text); const v=getVoice();
   if(v) u.voice=v; u.rate=state.rate; u.lang='en-US'; speechSynthesis.cancel(); speechSynthesis.speak(u);
 }
+// This function is no longer used by Flashcards or Listen game, but kept for potential other uses.
 function speakCard(c){
-  const parts=[c.w]; // อ่านคำศัพท์ก่อน
+  const parts=[c.w];
   const sents = Array.isArray(c.s)? c.s : (c.s? [c.s] : []);
-  if(sents.length){ parts.push(sents.join(' ')); } // ตามด้วยประโยคตัวอย่างทั้งหมด
+  if(sents.length){ parts.push(sents.join(' ')); }
   speak(parts.join('. '));
 }
 
@@ -235,7 +235,23 @@ function Flashcards(fresh=true){
   const again=document.createElement('button'); again.className='btn warn'; again.textContent='⟲ ยังจำไม่ได้';
   const readB=document.createElement('button'); readB.className='btn primary'; readB.textContent='🔊 อ่าน';
   const know=document.createElement('button'); know.className='btn ok'; know.textContent='✓ จำได้แล้ว';
-  readB.onclick=()=>{ const c=flashState.order[flashState.idx%flashState.order.length]; speakCard(c); };
+  
+  // === MODIFICATION FOR FLASHCARDS ===
+  readB.onclick=()=>{
+    const c = flashState.order[flashState.idx % flashState.order.length];
+    if (!flashState.flipped) {
+      // Front of card: Speak only the word
+      speak(c.w);
+    } else {
+      // Back of card: Speak only the sentences
+      const sents = Array.isArray(c.s) ? c.s : (c.s ? [c.s] : []);
+      if (sents.length) {
+        speak(sents.join(' '));
+      }
+    }
+  };
+  // === END MODIFICATION ===
+
   know.onclick=()=>{ flashState.order.splice(flashState.idx,1); if(!flashState.order.length){ flashState.order=[...items]; flashState.idx=0; } flashState.flipped=false; draw(); };
   again.onclick=()=>{ const cur=flashState.order[flashState.idx]; flashState.order.splice(flashState.idx,1); flashState.order.splice(Math.min(flashState.order.length,3),0,cur); flashState.flipped=false; draw(); };
   controls.append(again,readB,know); wrap.appendChild(controls); return wrap;
@@ -297,7 +313,8 @@ function ListenGame(fresh=true){
     const opts = sample(words,4);
     const answer = opts[(Math.random()*4)|0];
     listenState.q={opts,answer}; listenState.round++; draw();
-    setTimeout(()=> speakCard(answer), 200);
+    // === MODIFICATION FOR LISTEN GAME (1) ===
+    setTimeout(()=> speak(answer.w), 200);
   }
   function draw(){
     wrap.innerHTML='';
@@ -316,7 +333,8 @@ function ListenGame(fresh=true){
       };
       opts.appendChild(b);
     });
-    wrap.querySelector('#play').onclick=()=> speakCard(listenState.q.answer);
+    // === MODIFICATION FOR LISTEN GAME (2) ===
+    wrap.querySelector('#play').onclick=()=> speak(listenState.q.answer.w);
     wrap.querySelector('#shuffle').onclick=()=> next();
   }
   if(fresh || !listenState.mounted){ listenState.mounted=true; next(); } else { draw(); }
